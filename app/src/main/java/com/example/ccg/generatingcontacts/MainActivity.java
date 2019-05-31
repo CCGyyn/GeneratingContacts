@@ -20,8 +20,11 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.Toast;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.Random;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener{
@@ -30,14 +33,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     Button button2;
     Button button3;
     Button button4;
+    EditText contactCount;
+    EditText smsCount;
     // 生成的联系人个数
-    int count = 10;
+    int count = 3000;
     // 默认app
     private String defaultSmsPkg;
     // my app
     private String mySmsPkg;
     // 随机生成的短信总条数
-    int sms_count = 3;
+    int sms_count = 3000;
     // 短信uri
     private final Uri SMS_INBOX = Uri.parse("content://sms");
     private final Uri SMS_ADDRESS = Uri.parse("content://mms-sms/canonical-addresses");
@@ -53,29 +58,38 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         button2 = (Button) findViewById(R.id.button_delete);
         button3 = (Button) findViewById(R.id.sms_add);
         button4 = (Button) findViewById(R.id.sms_delete);
+        contactCount = (EditText) findViewById(R.id.contact_count);
+        smsCount = (EditText) findViewById(R.id.sms_count);
         button1.setOnClickListener(this);
         button2.setOnClickListener(this);
         button3.setOnClickListener(this);
         button4.setOnClickListener(this);
-        defaultSmsPkg = Telephony.Sms.getDefaultSmsPackage(this);
+//        defaultSmsPkg = Telephony.Sms.getDefaultSmsPackage(this); // 如果一开始就被改成默认应用的话就无效了，就不会改回原来的信息默认应用。
         mySmsPkg = this.getPackageName();
-
-
-        if(ContextCompat.checkSelfPermission(MainActivity.this, Manifest.
-                permission.WRITE_CONTACTS) != PackageManager.PERMISSION_GRANTED){
-            ActivityCompat.requestPermissions(MainActivity.this, new
-                    String[]{ Manifest.permission.WRITE_CONTACTS}, 1);
-        }else{
-            add();
-//            addContact("test", "13430928877");
-        }
     }
 
     @Override
     public void onClick(View v) {
         switch (v.getId()) {
             case R.id.button_add:
-                add();
+                if(ContextCompat.checkSelfPermission(MainActivity.this, Manifest.
+                        permission.WRITE_CONTACTS) != PackageManager.PERMISSION_GRANTED){
+                    ActivityCompat.requestPermissions(MainActivity.this, new
+                            String[]{ Manifest.permission.WRITE_CONTACTS}, 1);
+                }else{
+                    Toast.makeText(this, "开始添加联系人数据", Toast.LENGTH_SHORT).show();
+                    /*Method method = null;
+                    try {
+                        method = MainActivity.class.getMethod("add");
+                    } catch (NoSuchMethodException e) {
+                        e.printStackTrace();
+                    }
+                    methodByThread(method);*/
+                    if(!contactCount.getText().toString().isEmpty()) {
+                        count = Integer.valueOf(contactCount.getText().toString());
+                    }
+                    addByThread();
+                }
                 break;
             case R.id.button_delete:
                 if(ContextCompat.checkSelfPermission(MainActivity.this, Manifest
@@ -83,23 +97,129 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     ActivityCompat.requestPermissions(MainActivity.this, new
                             String[]{ Manifest.permission.READ_CONTACTS}, 3);
                 } else {
-                    delete();
+                    Toast.makeText(this, "开始删除联系人数据", Toast.LENGTH_SHORT).show();
+                    deleteByThread();
                 }
                 break;
             case R.id.sms_add:{
+                defaultSmsPkg = Telephony.Sms.getDefaultSmsPackage(this); // 防止中途出现'this' is not available，没有实时获取当前默认应用
+                if(!smsCount.getText().toString().isEmpty()) {
+                    sms_count = Integer.valueOf(smsCount.getText().toString());
+                }
                 addToInsertSms();
             }
                 break;
+            case R.id.sms_delete:{
+                defaultSmsPkg = Telephony.Sms.getDefaultSmsPackage(this);
+                deleteSms();
+            }
+            break;
             default:
                 break;
         }
     }
 
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        switch (requestCode){
+            case 1:
+                if( grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED ){
+                    /*Method method = null;
+                    try {
+                        method = MainActivity.class.getMethod("add");
+                    } catch (NoSuchMethodException e) {
+                        e.printStackTrace();
+                    }
+                    methodByThread(method);*/
+                    addByThread();
+                }else{
+                    Toast.makeText(this, "You denied the permission", Toast.LENGTH_SHORT).show();
+                }
+                break;/*
+            case 2:
+                if(grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    sentSms();
+                } else {
+                    Toast.makeText(this, "You denied the permission", Toast.LENGTH_SHORT).show();
+                }
+                break;*/
+            case 3:
+                if(grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    deleteByThread();
+                } else {
+                    Toast.makeText(this, "You denied the permission", Toast.LENGTH_SHORT).show();
+                }
+                break;
+            default:
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        switch (requestCode) {
+            case 1:
+                if(resultCode == RESULT_OK) {
+                    addToInsertSmsByThread();
+                }
+                break;
+            case 2:
+                if(resultCode == RESULT_OK) {
+                    deleteSmsToPhoneByThread();
+                }
+                break;
+            default:
+
+        }
+
+    }
+    /**
+     * 开启子线程进行批量生成联系人
+     */
+    public void addByThread() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                add();
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(MainActivity.this, "数据添加成功", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        }).start();
+    }
+    /**
+     * 开启子线程执行耗时方法
+     * @param method
+     * @throws Exception
+     * 可能是使用的时候有问题
+     */
+    @Deprecated
+    private void methodByThread(final Method method){
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    method.invoke(MainActivity.class);
+                } catch (IllegalAccessException e) {
+                    e.printStackTrace();
+                } catch (InvocationTargetException e) {
+                    e.printStackTrace();
+                }
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(MainActivity.this, "数据添加成功", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        }).start();
+    }
     /**
      * 批量生成联系人
      */
-    private void add() {
-        Toast.makeText(this, "开始添加联系人数据", Toast.LENGTH_SHORT).show();
+    public void add() {
         // 随机数
         Random random = new Random();
         for(int i = 0;i < count;i++) {
@@ -109,35 +229,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             String phoneNum = getRandomPhone();
             addContact(name, phoneNum);
         }
-        Toast.makeText(this, "联系人数据添加成功", Toast.LENGTH_SHORT).show();
-    }
 
-    /**
-     * 批量生成短信信息
-     */
-    private void addToInsertSms() {
-        if(!defaultSmsPkg.equals(mySmsPkg)) {
-            // 如果这个App不是默认的Sms App，则修改成默认的SMS APP
-            // 因为从Android 4.4开始，只有默认的SMS APP才能对SMS数据库进行处理
-            Intent intent = new Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT); // android.provider.Telephony.ACTION_CHANGE_DEFAULT
-            intent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, mySmsPkg);
-            startActivityForResult(intent, 1);
-        }
-        for(int i = 0;i < sms_count;i++) {
-            addSmsToPhone(i);
-        }
-        // 对短信数据库处理结束，恢复原来的默认SMS APP
-        Intent intent = new Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT);
-        intent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, defaultSmsPkg);
-        startActivity(intent);
-        Log.d(tag, "Recover default SMS App");
     }
     /**
      * 生成联系人
      * @param name
      * @param phoneNum
      */
-    private void addContact(String name, String phoneNum) {
+    public void addContact(String name, String phoneNum) {
         ContentValues values = new ContentValues();
         // content://com.android.contacts/raw_contacts
         Uri rawContactUri = getContentResolver().insert(ContactsContract.RawContacts.CONTENT_URI, values);
@@ -171,11 +270,27 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         getContentResolver().insert(ContactsContract.Data.CONTENT_URI, values);
         values.clear();
     }
-
+    /**
+     * 开启子线程进行批量删除联系人
+     */
+    public void deleteByThread() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                delete();
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(MainActivity.this, "数据删除成功", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        }).start();
+    }
     /**
      * 删除全部联系人
      */
-    private void delete() {
+    public void delete() {
         Cursor cursor = getContentResolver().query(
                 ContactsContract.Contacts.CONTENT_URI,
                 null,
@@ -193,9 +308,49 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             String[] whereparams = new String[]{rawId};
             getContentResolver().delete(ContactsContract.RawContacts.CONTENT_URI, where, whereparams);
         }
-        Toast.makeText(this, "联系人全部删除成功", Toast.LENGTH_SHORT).show();
     }
+    /**
+     *开启子线程进行批量生成短信信息
+     */
+    public void addToInsertSmsByThread() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(MainActivity.this, "开始添加短信数据", Toast.LENGTH_SHORT).show();
+                    }
+                });
+                for(int i = 0;i < sms_count;i++) {
+                    addSmsToPhone(i);
+                }
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(MainActivity.this, "数据插入成功", Toast.LENGTH_SHORT).show();
+                        // 对短信数据库处理结束，恢复原来的默认SMS APP
+                        reductionApp();
+                    }
+                });
+            }
+        }).start();
+    }
+    /**
+     * 批量生成短信信息
+     */
+    public void addToInsertSms() {
+        if(!defaultSmsPkg.equals(mySmsPkg)) {
+            // 如果这个App不是默认的Sms App，则修改成默认的SMS APP
+            // 因为从Android 4.4开始，只有默认的SMS APP才能对SMS数据库进行处理
+            Intent intent = new Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT); // android.provider.Telephony.ACTION_CHANGE_DEFAULT
+            intent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, mySmsPkg); // package
+            startActivityForResult(intent, 1);
+        } else {
+            addToInsertSmsByThread();
+        }
 
+    }
     /**
      * 写入短信信息
      */
@@ -274,11 +429,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         };
         t.start();
     }
-
     /**
      * 取代默认app应用来写入短息信息
+     * 默认应用不需要申请权限，取代默认应用会弹窗进行确认
      */
-    private void addSmsToPhone(int i) {
+    public void addSmsToPhone(int i) {
         if(mySmsPkg.equals(Telephony.Sms.getDefaultSmsPackage(MainActivity.this))) {
             String phoneNum = getRandomPhone();
             StringBuffer sb = new StringBuffer();
@@ -301,54 +456,84 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 /*            if(uri != null) {
                 long uriId = ContentUris.parseId(uri);
             }*/
-            Toast.makeText(MainActivity.this, "短信信息添加完成",
-                    Toast.LENGTH_SHORT).show();
-
     }
     }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        switch (requestCode){
-            case 1:
-                if( grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED ){
-                    add();
-                }else{
-                    Toast.makeText(this, "You denied the permission", Toast.LENGTH_SHORT).show();
-                }
-                break;/*
-            case 2:
-                if(grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    sentSms();
-                } else {
-                    Toast.makeText(this, "You denied the permission", Toast.LENGTH_SHORT).show();
-                }
-                break;*/
-            case 3:
-                if(grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    delete();
-                } else {
-                    Toast.makeText(this, "You denied the permission", Toast.LENGTH_SHORT).show();
-                }
-                break;
-            default:
+    /**
+     * 开启子线程进行批量删除短信
+     */
+    public void deleteSmsToPhoneByThread() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(MainActivity.this, "开始删除短信数据", Toast.LENGTH_SHORT).show();
+                    }
+                });
+                deleteSmsToPhone();
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(MainActivity.this, "数据删除成功", Toast.LENGTH_SHORT).show();
+                        // 对短信数据库处理结束，恢复原来的默认SMS APP
+                        reductionApp();
+                    }
+                });
+            }
+        }).start();
+    }
+    /**
+     * 批量删除短信信息
+     */
+    public void deleteSms() {
+        if(!defaultSmsPkg.equals(mySmsPkg)) {
+            // 如果这个App不是默认的Sms App，则修改成默认的SMS APP
+            // 因为从Android 4.4开始，只有默认的SMS APP才能对SMS数据库进行处理
+            Intent intent = new Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT); // android.provider.Telephony.ACTION_CHANGE_DEFAULT
+            intent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, mySmsPkg);
+            startActivityForResult(intent, 2);
+        } else {
+            deleteSmsToPhoneByThread();
         }
     }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        switch (requestCode) {
-            case 1:
-                if(resultCode == RESULT_OK) {
-                    addToInsertSms();
-                }
-                break;
-            default:
-
+    /**
+     * 取代默认app应用来删除短息信息
+     */
+    public void deleteSmsToPhone() {
+        if(mySmsPkg.equals(Telephony.Sms.getDefaultSmsPackage(MainActivity.this))) {
+            Cursor cursor = getContentResolver().query(
+                    Telephony.Sms.CONTENT_URI,
+                    null,
+                    null,
+                    null,
+                    null
+            );
+            while (cursor.moveToNext()) {
+                String id = cursor.getString(cursor.getColumnIndex(Telephony.Sms._ID));
+                String where = Telephony.Sms._ID + "=?";
+                String[] whereParams = new String[] {id};
+                getContentResolver().delete(
+                        Telephony.Sms.CONTENT_URI,
+                        where,
+                        whereParams
+                        );
+            }
         }
-
     }
-
+    /**
+     * 将短信默认应用修改为信息
+     */
+    public void reductionApp() {
+        Intent intent = new Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT);
+        if(!defaultSmsPkg.equals(mySmsPkg)) {
+            intent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, defaultSmsPkg);
+        } else {
+            intent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, "com.android.mms");
+        }
+        startActivity(intent);
+        Log.d(tag, "Recover default SMS App");
+    }
     /**
      * 产生随机字符串
      * @param length
@@ -370,7 +555,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         //将承载的字符转换成字符串
         return sb.toString();
     }
-
     /**
      * 产生随机11位数字
      * @return
