@@ -10,7 +10,7 @@
         android:id="@+id/contact_count"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:maxLength="4"
+        android:maxLength="5"
         android:digits="1234567890"
         android:hint="生成联系人数，默认3000"
         />
@@ -33,7 +33,7 @@
         android:id="@+id/sms_count"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:maxLength="4"
+        android:maxLength="5"
         android:digits="1234567890"
         android:hint="生成短信条数，默认3000"
         app:layout_constraintTop_toBottomOf="@id/button_delete"
