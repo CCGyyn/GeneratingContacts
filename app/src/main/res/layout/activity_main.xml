@@ -12,22 +12,23 @@
         android:layout_height="wrap_content"
         android:maxLength="5"
         android:digits="1234567890"
-        android:hint="生成联系人数，默认3000"
+        android:hint="生成联系人，默认3000"
         />
 
     <Button
-        android:id="@+id/button_add"
-        android:layout_width="match_parent"
+        android:id="@+id/contact_add"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="生成联系人"
         app:layout_constraintTop_toBottomOf="@+id/contact_count"
         />
     <Button
-        android:id="@+id/button_delete"
-        android:layout_width="match_parent"
+        android:id="@+id/contact_delete"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="删除全部联系人"
-        app:layout_constraintTop_toBottomOf="@+id/button_add"
+        android:text="删除联系人"
+        app:layout_constraintTop_toBottomOf="@+id/contact_count"
+        app:layout_constraintRight_toRightOf="parent"
         />
     <EditText
         android:id="@+id/sms_count"
@@ -35,21 +36,74 @@
         android:layout_height="wrap_content"
         android:maxLength="5"
         android:digits="1234567890"
-        android:hint="生成短信条数，默认3000"
-        app:layout_constraintTop_toBottomOf="@id/button_delete"
+        android:hint="生成短信，默认3000"
+        app:layout_constraintTop_toBottomOf="@id/contact_delete"
         />
     <Button
         android:id="@+id/sms_add"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="生成短信"
         app:layout_constraintTop_toBottomOf="@+id/sms_count"
         />
     <Button
         android:id="@+id/sms_delete"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="删除短信"
+        app:layout_constraintTop_toBottomOf="@+id/sms_count"
+        app:layout_constraintRight_toRightOf="parent"
+        />
+    <EditText
+        android:id="@+id/info_count"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="删除全部短信"
-        app:layout_constraintTop_toBottomOf="@+id/sms_add"
+        android:maxLength="5"
+        android:digits="1234567890"
+        android:hint="生成通知，默认3000"
+        app:layout_constraintTop_toBottomOf="@id/sms_delete"
         />
+    <Button
+        android:id="@+id/info_add"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="生成通知"
+        app:layout_constraintTop_toBottomOf="@+id/info_count"
+        />
+    <EditText
+        android:id="@+id/call_records_count"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxLength="5"
+        android:digits="1234567890"
+        android:hint="生成通讯录，默认3000"
+        app:layout_constraintTop_toBottomOf="@id/info_add"
+        />
+    <Button
+        android:id="@+id/call_records_add"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="生成通话记录"
+        app:layout_constraintTop_toBottomOf="@+id/call_records_count"
+        />
+    <Button
+        android:id="@+id/call_records_delete"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="删除通话记录"
+        app:layout_constraintTop_toBottomOf="@+id/call_records_count"
+        app:layout_constraintRight_toRightOf="parent"
+        />
+    <EditText
+        android:id="@+id/sms_item"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="生成短信会话，默认200"
+        app:layout_constraintTop_toBottomOf="@id/call_records_add"/>
+    <Button
+        android:id="@+id/sms_item_add"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="生成多条短信"
+        app:layout_constraintTop_toBottomOf="@id/sms_item"/>
 </android.support.constraint.ConstraintLayout>

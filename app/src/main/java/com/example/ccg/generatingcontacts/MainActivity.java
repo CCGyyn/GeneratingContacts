@@ -1,7 +1,10 @@
 package com.example.ccg.generatingcontacts;
 
 import android.Manifest;
-import android.app.Activity;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.ContentUris;
 import android.content.ContentValues;
@@ -9,14 +12,18 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.UserHandle;
+import android.provider.CallLog;
 import android.provider.ContactsContract;
 import android.provider.Telephony;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.app.NotificationCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -27,51 +34,99 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Random;
 
+/**
+ * @author cai_gp
+ */
 public class MainActivity extends AppCompatActivity implements View.OnClickListener{
+    private static final int PUSH_NOTIFICATION_ID = (0x001);
+    private static final String PUSH_CHANNEL_ID = "PUSH_NOTIFY_ID";
+    private static final String PUSH_CHANNEL_NAME = "PUSH_NOTIFY_NAME";
+    private Button contactAddButton;
+    private Button contactDeleteButton;
+    private Button smsAddButton;
+    private Button smsDeleteButton;
+    private Button infoAddButton;
+    private Button callRecordsAddButton;
+    private Button callRecordsDeleteButton;
 
-    Button button1;
-    Button button2;
-    Button button3;
-    Button button4;
+    Button smsItemAddButton;
     EditText contactCount;
     EditText smsCount;
-    // 生成的联系人个数
+    EditText callRecordsCount;
+    EditText smsItem;
+    private final int CALL_WRITE_REQUEST_CODE = 4;
+    private final int CALL_READ_REQUEST_CODE = 5;
+    int sms_item = 200;
+    int call_records_count = 3000;
+    /**
+     * 生成的联系人个数
+     */
     int count = 3000;
-    // 默认app
+    /**
+     * 默认app
+     */
     private String defaultSmsPkg;
-    // my app
+    /**
+     * my app
+     */
     private String mySmsPkg;
-    // 随机生成的短信总条数
+    /**
+     * 随机生成的短信总条数
+     */
     int sms_count = 3000;
-    // 短信uri
+    /**
+     * 随机生成通知条数
+     */
+    int info_count = 3000;
+    /**
+     * 短信uri
+     */
     private final Uri SMS_INBOX = Uri.parse("content://sms");
     private final Uri SMS_ADDRESS = Uri.parse("content://mms-sms/canonical-addresses");
     private final Uri SMS_THREADS = Uri.parse("content://mms-sms/conversations");
 
     final String tag = "MainActivity";
+    private EditText infoCount;
+    private NotificationManager notificationManager;
+    private NotificationCompat.Builder builder;
+    private Notification notification;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        button1 = (Button) findViewById(R.id.button_add);
-        button2 = (Button) findViewById(R.id.button_delete);
-        button3 = (Button) findViewById(R.id.sms_add);
-        button4 = (Button) findViewById(R.id.sms_delete);
+
+        contactAddButton = (Button) findViewById(R.id.contact_add);
+        contactDeleteButton = (Button) findViewById(R.id.contact_delete);
+        smsAddButton = (Button) findViewById(R.id.sms_add);
+        smsDeleteButton = (Button) findViewById(R.id.sms_delete);
+        infoAddButton = (Button) findViewById(R.id.info_add);
+        callRecordsAddButton = (Button)findViewById(R.id.call_records_add);
+        callRecordsDeleteButton = (Button)findViewById(R.id.call_records_delete);
+        smsItemAddButton = (Button) findViewById(R.id.sms_item_add);
+
+        callRecordsCount = (EditText) findViewById(R.id.call_records_count);
         contactCount = (EditText) findViewById(R.id.contact_count);
         smsCount = (EditText) findViewById(R.id.sms_count);
-        button1.setOnClickListener(this);
-        button2.setOnClickListener(this);
-        button3.setOnClickListener(this);
-        button4.setOnClickListener(this);
-//        defaultSmsPkg = Telephony.Sms.getDefaultSmsPackage(this); // 如果一开始就被改成默认应用的话就无效了，就不会改回原来的信息默认应用。
+        infoCount = (EditText) findViewById(R.id.info_count);
+        smsItem = (EditText) findViewById(R.id.sms_item);
+
+        contactAddButton.setOnClickListener(this);
+        contactDeleteButton.setOnClickListener(this);
+        smsAddButton.setOnClickListener(this);
+        smsDeleteButton.setOnClickListener(this);
+        infoAddButton.setOnClickListener(this);
+        callRecordsAddButton.setOnClickListener(this);
+        callRecordsDeleteButton.setOnClickListener(this);
+        smsItemAddButton.setOnClickListener(this);
+        // defaultSmsPkg = Telephony.Sms.getDefaultSmsPackage(this); // 如果一开始就被改成默认应用的话就无效了，就不会改回原来的信息默认应用。
         mySmsPkg = this.getPackageName();
     }
 
     @Override
     public void onClick(View v) {
         switch (v.getId()) {
-            case R.id.button_add:
+            case R.id.contact_add:
                 if(ContextCompat.checkSelfPermission(MainActivity.this, Manifest.
                         permission.WRITE_CONTACTS) != PackageManager.PERMISSION_GRANTED){
                     ActivityCompat.requestPermissions(MainActivity.this, new
@@ -91,7 +146,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     addByThread();
                 }
                 break;
-            case R.id.button_delete:
+            case R.id.contact_delete:
                 if(ContextCompat.checkSelfPermission(MainActivity.this, Manifest
                         .permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
                     ActivityCompat.requestPermissions(MainActivity.this, new
@@ -102,7 +157,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 }
                 break;
             case R.id.sms_add:{
-                defaultSmsPkg = Telephony.Sms.getDefaultSmsPackage(this); // 防止中途出现'this' is not available，没有实时获取当前默认应用
+                // 防止中途出现'this' is not available，没有实时获取当前默认应用
+                defaultSmsPkg = Telephony.Sms.getDefaultSmsPackage(this);
                 if(!smsCount.getText().toString().isEmpty()) {
                     sms_count = Integer.valueOf(smsCount.getText().toString());
                 }
@@ -112,6 +168,55 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             case R.id.sms_delete:{
                 defaultSmsPkg = Telephony.Sms.getDefaultSmsPackage(this);
                 deleteSms();
+            }
+                break;
+            case R.id.info_add:
+                Toast.makeText(this, "开始添加通知数据", Toast.LENGTH_SHORT).show();
+                if(!infoCount.getText().toString().isEmpty()) {
+                    info_count = Integer.valueOf(infoCount.getText().toString());
+                }else{
+                    info_count =3000;
+                }
+                getInfoMations();
+                break;
+            case R.id.call_records_add:{
+                if (ContextCompat.checkSelfPermission(MainActivity.this,Manifest.permission.WRITE_CALL_LOG)
+                        !=PackageManager.PERMISSION_GRANTED){
+                    ActivityCompat.requestPermissions(this,
+                            new String[]{Manifest.permission.WRITE_CALL_LOG}, CALL_WRITE_REQUEST_CODE);
+                }else {
+                    if(!callRecordsCount.getText().toString().isEmpty()) {
+                        call_records_count = Integer.valueOf(callRecordsCount.getText().toString());
+                    }
+                    addCallRecordsByThread();
+                }
+                break;
+            }
+            case R.id.call_records_delete:{
+                /*if ((ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_CALL_LOG) != PackageManager.PERMISSION_GRANTED)
+                        &&(ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED)){
+                    ActivityCompat.requestPermissions(this,
+                            new String[]{Manifest.permission.WRITE_CALL_LOG}, CALL_WRITE_REQUEST_CODE);
+                    ActivityCompat.requestPermissions(this,
+                            new String[]{Manifest.permission.READ_CALL_LOG}, CALL_READ_REQUEST_CODE);
+                }*/
+                if (ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED){
+                    ActivityCompat.requestPermissions(this,
+                            new String[]{Manifest.permission.READ_CALL_LOG}, CALL_READ_REQUEST_CODE);
+                } else {
+                    deleteCallRecordsByThread();
+                }
+                break;
+            }
+            case R.id.sms_item_add:{
+                defaultSmsPkg = Telephony.Sms.getDefaultSmsPackage(this);
+                if(!smsCount.getText().toString().isEmpty()) {
+                    sms_count = Integer.valueOf(smsCount.getText().toString());
+                }
+                if(!smsItem.getText().toString().isEmpty()){
+                    sms_item = Integer.valueOf(smsItem.getText().toString());
+                }
+                addItemToInsertSms();
             }
             break;
             default:
@@ -124,13 +229,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         switch (requestCode){
             case 1:
                 if( grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED ){
-                    /*Method method = null;
-                    try {
-                        method = MainActivity.class.getMethod("add");
-                    } catch (NoSuchMethodException e) {
-                        e.printStackTrace();
-                    }
-                    methodByThread(method);*/
                     addByThread();
                 }else{
                     Toast.makeText(this, "You denied the permission", Toast.LENGTH_SHORT).show();
@@ -150,6 +248,29 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     Toast.makeText(this, "You denied the permission", Toast.LENGTH_SHORT).show();
                 }
                 break;
+            case CALL_WRITE_REQUEST_CODE:{
+                if(grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    if(!callRecordsCount.getText().toString().isEmpty()) {
+                        call_records_count = Integer.valueOf(callRecordsCount.getText().toString());
+                    }
+                    addCallRecordsByThread();
+                    Log.d("permissions:",permissions.toString());
+                } else {
+                    Toast.makeText(this, "You denied the call log write permission", Toast.LENGTH_SHORT).show();
+                    Log.d("permissions:",permissions.toString());
+                }
+                break;
+            }
+            case CALL_READ_REQUEST_CODE:{
+                if(grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    deleteCallRecordsByThread();
+                    Log.d("permissions:",permissions.toString());
+                } else {
+                    Toast.makeText(this, "You denied the call log read permission", Toast.LENGTH_SHORT).show();
+                    Log.d("permissions:",permissions.toString());
+                }
+                break;
+            }
             default:
         }
     }
@@ -167,11 +288,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     deleteSmsToPhoneByThread();
                 }
                 break;
+            case 3:
+                if(resultCode == RESULT_OK){
+                    addItemToInsertSmsByThread();
+                }
+                break;
             default:
 
         }
 
     }
+
     /**
      * 开启子线程进行批量生成联系人
      */
@@ -189,6 +316,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
         }).start();
     }
+
     /**
      * 开启子线程执行耗时方法
      * @param method
@@ -216,6 +344,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
         }).start();
     }
+
     /**
      * 批量生成联系人
      */
@@ -231,6 +360,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
 
     }
+
     /**
      * 生成联系人
      * @param name
@@ -270,6 +400,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         getContentResolver().insert(ContactsContract.Data.CONTENT_URI, values);
         values.clear();
     }
+
     /**
      * 开启子线程进行批量删除联系人
      */
@@ -287,6 +418,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
         }).start();
     }
+
     /**
      * 删除全部联系人
      */
@@ -309,6 +441,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             getContentResolver().delete(ContactsContract.RawContacts.CONTENT_URI, where, whereparams);
         }
     }
+
     /**
      *开启子线程进行批量生成短信信息
      */
@@ -336,6 +469,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
         }).start();
     }
+
     /**
      * 批量生成短信信息
      */
@@ -343,14 +477,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         if(!defaultSmsPkg.equals(mySmsPkg)) {
             // 如果这个App不是默认的Sms App，则修改成默认的SMS APP
             // 因为从Android 4.4开始，只有默认的SMS APP才能对SMS数据库进行处理
-            Intent intent = new Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT); // android.provider.Telephony.ACTION_CHANGE_DEFAULT
-            intent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, mySmsPkg); // package
+            // android.provider.Telephony.ACTION_CHANGE_DEFAULT
+            Intent intent = new Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT);
+            // package
+            intent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, mySmsPkg);
             startActivityForResult(intent, 1);
         } else {
             addToInsertSmsByThread();
         }
 
     }
+
     /**
      * 写入短信信息
      */
@@ -429,6 +566,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         };
         t.start();
     }
+
     /**
      * 取代默认app应用来写入短息信息
      * 默认应用不需要申请权限，取代默认应用会弹窗进行确认
@@ -458,6 +596,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }*/
     }
     }
+
     /**
      * 开启子线程进行批量删除短信
      */
@@ -483,6 +622,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
         }).start();
     }
+
     /**
      * 批量删除短信信息
      */
@@ -497,6 +637,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             deleteSmsToPhoneByThread();
         }
     }
+
     /**
      * 取代默认app应用来删除短息信息
      */
@@ -521,6 +662,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
         }
     }
+
     /**
      * 将短信默认应用修改为信息
      */
@@ -534,6 +676,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         startActivity(intent);
         Log.d(tag, "Recover default SMS App");
     }
+
     /**
      * 产生随机字符串
      * @param length
@@ -555,6 +698,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         //将承载的字符转换成字符串
         return sb.toString();
     }
+
     /**
      * 产生随机11位数字
      * @return
@@ -574,5 +718,260 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
         //将承载的字符转换成字符串
         return sb.toString();
+    }
+
+    @Override
+    public synchronized ComponentName startForegroundServiceAsUser(Intent service, UserHandle user) {
+        return null;
+    }
+
+    /**
+     * 生成通知
+     */
+    public void getInfoMation(int i){
+
+//        Intent notificationIntent = new Intent(MainActivity.this, MainActivity.class);
+////        notificationIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+////        PendingIntent pendingIntent = PendingIntent.getActivity(MainActivity.this, 10086, notificationIntent, 0);
+        builder.setContentTitle("系统通知:")//设置通知栏标题
+//                .setContentIntent(pendingIntent) //设置通知栏点击意图
+                .setContentText("数字"+i)
+//                .setTicker(msg.getDisplayMessageBody()) //通知首次出现在通知栏，带上升动画效果的
+                .setWhen(System.currentTimeMillis())//通知产生的时间，会在通知信息里显示，一般是系统获取到的时间
+                .setSmallIcon(R.mipmap.ic_launcher)//设置通知小ICON
+                .setChannelId(PUSH_CHANNEL_ID)
+                .setDefaults(Notification.DEFAULT_ALL);
+
+        notification = builder.build();
+        notification.flags |= Notification.FLAG_AUTO_CANCEL;
+        if (notificationManager != null) {
+            notificationManager.notify(i, notification);
+        }
+
+    }
+
+    /**
+     * 批量生成通知
+     */
+    public void getInfoMations(){
+        notificationManager = (NotificationManager) MainActivity.this.getSystemService(NOTIFICATION_SERVICE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(PUSH_CHANNEL_ID, PUSH_CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH);
+            if (notificationManager != null) {
+                notificationManager.createNotificationChannel(channel);
+            }
+        }
+
+        builder = new NotificationCompat.Builder(MainActivity.this,PUSH_CHANNEL_ID);
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(MainActivity.this, "开始生成通知数据", Toast.LENGTH_SHORT).show();
+                    }
+                });
+                for(int i = 0;i < info_count;i++) {
+                    getInfoMation(i);
+                }
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(MainActivity.this, "数据生成成功", Toast.LENGTH_SHORT).show();
+                        // 对短信数据库处理结束，恢复原来的默认SMS APP
+                    }
+                });
+            }
+        }).start();
+    }
+
+    /**
+     * 开启线程批量添加通话记录
+     * @Autor chen hao
+     */
+    public void addCallRecordsByThread(){
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(MainActivity.this, "开始添加通话记录", Toast.LENGTH_SHORT).show();
+                    }
+                });
+                addCallRecords();
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(MainActivity.this, "通话记录添加成功", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        }).start();
+    }
+
+    /**
+     * 批量添加通话记录
+     * @Autor chen hao
+     */
+    public void addCallRecords(){
+        // 随机数
+        Random random = new Random();
+        OneCall call = new OneCall();
+        for(int i = 0; i < call_records_count; i++) {
+            int time = random.nextInt(15);
+            call.setNumber(getRandomPhone());
+            call.setType(Integer.toString(random.nextInt(2)+1));
+            call.setDuration(Integer.toString(time));
+            addOneCallRecord(call);
+        }
+    }
+
+    /**
+     * 添加一条通话记录
+     * @Autor chen hao
+     */
+    public void addOneCallRecord(OneCall call){
+        ContentValues values = new ContentValues();
+        values.clear();
+        values.put(CallLog.Calls.NUMBER, call.getNumber());
+        values.put(CallLog.Calls.DATE, System.currentTimeMillis() );
+        values.put(CallLog.Calls.DURATION, call.getDuration());
+        values.put(CallLog.Calls.TYPE, call.getType());
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_CALL_LOG) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.WRITE_CALL_LOG}, CALL_WRITE_REQUEST_CODE);
+        }
+        getContentResolver().insert(CallLog.Calls.CONTENT_URI, values);
+        values.clear();
+    }
+
+    /**
+     * 开启子线程进行批量删除通话记录
+     * @Autor  chen hao
+     */
+    public void deleteCallRecordsByThread() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                deleteCallRecords();
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(MainActivity.this, "所有通话记录删除成功", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        }).start();
+    }
+
+    /**
+     * 删除全部通话记录
+     * @Autor  chen hao
+     */
+    public void deleteCallRecords() {
+        if ((ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_CALL_LOG) != PackageManager.PERMISSION_GRANTED)
+                &&(ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED)){
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.WRITE_CALL_LOG}, CALL_WRITE_REQUEST_CODE);
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.READ_CALL_LOG}, CALL_READ_REQUEST_CODE);
+        }
+        Cursor cursor = getContentResolver().query(
+                CallLog.Calls.CONTENT_URI,
+                null,
+                null,
+                null,
+                null
+        );
+        while (cursor.moveToNext()) {
+            // 获取ID
+            String rawId = cursor.getString(cursor.getColumnIndex(
+                    CallLog.Calls._ID
+            ));
+            // 删除
+            String where = CallLog.Calls._ID + "=?";
+            String[] whereparams = new String[]{rawId};
+            getContentResolver().delete(CallLog.Calls.CONTENT_URI, where, whereparams);
+        }
+    }
+
+    /** 批量生成多条短信内容
+     *
+     * @author huang_js
+     */
+    public void addItemToInsertSms() {
+        if(!defaultSmsPkg.equals(mySmsPkg)) {
+            // 如果这个App不是默认的Sms App，则修改成默认的SMS APP
+            // 因为从Android 4.4开始，只有默认的SMS APP才能对SMS数据库进行处理
+            Intent intent = new Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT);
+            intent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, mySmsPkg);
+            startActivityForResult(intent, 3);
+        } else {
+            addItemToInsertSmsByThread();
+        }
+    }
+
+    /**开启子线程生成多条短信内容,默认每个200条短信内容
+     *
+     * @author huang_js
+     *
+     */
+    public void addItemToInsertSmsByThread(){
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(MainActivity.this,"开始添加短信内容",Toast.LENGTH_SHORT).show();
+                    }
+                });
+                addItemToPhone();
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(MainActivity.this,"数据添加成功",Toast.LENGTH_SHORT).show();
+                        reductionApp();
+                    }
+                });
+            }
+        }).start();
+    }
+
+    /** 取代默认App应用来写入多条短信内容
+     *
+     * @author huang_js
+     */
+    public void addItemToPhone(){
+        if(mySmsPkg.equals(Telephony.Sms.getDefaultSmsPackage(MainActivity.this))){
+            String phoneNum = getRandomPhone();
+            StringBuffer sb;
+            Random random = new Random();
+            Log.d(tag,"My App is default SMS App.");
+            //对短信数据库进行处理
+            ContentResolver resolver = getContentResolver();
+            ContentValues values = new ContentValues();
+            values.put(Telephony.Sms.ADDRESS,phoneNum);
+            values.put(Telephony.Sms.DATE, System.currentTimeMillis());
+            long dateSent = System.currentTimeMillis() -5000;
+            values.put(Telephony.Sms.DATE_SENT,dateSent);
+            values.put(Telephony.Sms.READ,false);
+            values.put(Telephony.Sms.SEEN,false);
+            values.put(Telephony.Sms.STATUS,Telephony.Sms.STATUS_COMPLETE);
+            for(int j=0; j < sms_item * 2; j++){
+                //生成随机短信内容
+                if(j % 2 == 0) {
+                    values.put(Telephony.Sms.TYPE,Telephony.Sms.MESSAGE_TYPE_INBOX);
+                } else {
+                    values.put(Telephony.Sms.TYPE,Telephony.Sms.MESSAGE_TYPE_SENT);
+                }
+                sb = new StringBuffer("");
+                sb.append("短信内容：").append(getRandomString(random.nextInt(8)));
+                values.put(Telephony.Sms.BODY,sb.toString());
+                resolver.insert(Telephony.Sms.CONTENT_URI,values);
+            }
+        }
     }
 }
