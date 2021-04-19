@@ -229,6 +229,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         switch (requestCode){
             case 1:
                 if( grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED ){
+                    Toast.makeText(this, "开始添加联系人数据", Toast.LENGTH_SHORT).show();
+                    if(!contactCount.getText().toString().isEmpty()) {
+                        count = Integer.valueOf(contactCount.getText().toString());
+                    }
                     addByThread();
                 }else{
                     Toast.makeText(this, "You denied the permission", Toast.LENGTH_SHORT).show();
